@@ -188,3 +188,32 @@ python -m pip install pytest
 - Keep the raw FEVER and Wikipedia data in the expected locations.
 - Run the scripts in the order listed in Section 5 so the sample, cleaned data, embeddings, and index are regenerated before evaluation.
 - Record any changes to the selected claim subset, corpus files, or embedding model because they can change the coverage and retrieval scores.
+
+
+
+## 11. Dataset Download
+
+The raw FEVER and Wikipedia datasets are hosted separately on Google Drive because of their large file size.
+
+**Google Drive:** [Download EvidenceGuard Raw Dataset](https://drive.google.com/drive/folders/1UlbPZSXO7iF2E8YQi4OTK_-JpQgvVe2p?usp=sharing)
+
+### Dataset Structure
+
+After downloading, place the files inside `data/raw/` as follows:
+
+```text
+data/
+└── raw/
+    ├── paper_dev.jsonl
+    ├── wiki-pages.zip
+    └── wiki-pages/
+```
+
+### Dataset Setup
+
+1. Download the raw dataset from the Google Drive link.
+2. Extract the dataset if downloaded as a ZIP archive.
+3. Place the files in the `data/raw/` directory.
+4. Ensure the folder structure matches the structure shown above.
+
+The raw dataset is not included in this GitHub repository due to its large size.
