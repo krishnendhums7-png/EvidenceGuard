@@ -20,6 +20,9 @@ def retrieve_evidence(claim, model, index, evidence_df, top_k=3):
         dtype="float32"
     )
 
+    # Normalize the claim embedding for cosine similarity.
+    faiss.normalize_L2(claim_embedding)
+
     # Check that the embedding size matches the FAISS index.
     if claim_embedding.shape[1] != index.d:
         raise ValueError(
@@ -55,7 +58,7 @@ def retrieve_evidence(claim, model, index, evidence_df, top_k=3):
             "page_id": row["page_id"],
             "sentence_id": row["sentence_id"],
             "text": row["text"],
-            "distance": float(distance)
+            "similarity": float(distance)
         })
 
     return results
@@ -120,4 +123,4 @@ if __name__ == "__main__":
         print("Page:", result["page_id"])
         print("Sentence ID:", result["sentence_id"])
         print("Evidence:", result["text"])
-        print("Distance:", round(result["distance"], 4))
+        print("Similarity:", round(result["similarity"], 4))

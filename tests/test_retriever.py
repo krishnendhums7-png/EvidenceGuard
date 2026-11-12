@@ -120,7 +120,7 @@ def test_retrieval():
         print("Page:", result["page_id"])
         print("Sentence ID:", result["sentence_id"])
         print("Evidence:", result["text"])
-        print("Distance:", round(result["distance"], 4))
+        print("Similarity:", round(result["similarity"], 4))
 
 
 if __name__ == "__main__":

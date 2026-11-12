@@ -170,7 +170,16 @@ def evaluate_retrieval():
     hits_at_3 = 0
     hits_at_5 = 0
 
+
     # Evaluate only claims with available annotated evidence.
+    hit_at_1 = 0
+    hit_at_3 = 0
+    hit_at_5 = 0
+
+    evidence_recall_at_1 = 0
+    evidence_recall_at_3 = 0
+    evidence_recall_at_5 = 0
+
     for record, gold_evidence in covered_claims:
         results = retrieve_evidence(
             record["claim"],
@@ -188,40 +197,63 @@ def evaluate_retrieval():
             for result in results
         ]
 
-        if any(
-            item in gold_evidence
-            for item in retrieved_evidence[:1]
-        ):
-            hits_at_1 += 1
+        gold_evidence = set(gold_evidence)
 
-        if any(
-            item in gold_evidence
-            for item in retrieved_evidence[:3]
-        ):
-            hits_at_3 += 1
+        # Calculate Hit@k.
+        if gold_evidence.intersection(retrieved_evidence[:1]):
+            hit_at_1 += 1
 
-        if any(
-            item in gold_evidence
-            for item in retrieved_evidence[:5]
-        ):
-            hits_at_5 += 1
+        if gold_evidence.intersection(retrieved_evidence[:3]):
+            hit_at_3 += 1
 
-    # Calculate the proportion of covered claims with at least
-    # one annotated evidence sentence in the top k results.
-    recall_at_1 = hits_at_1 / covered_count
-    recall_at_3 = hits_at_3 / covered_count
-    recall_at_5 = hits_at_5 / covered_count
+        if gold_evidence.intersection(retrieved_evidence[:5]):
+            hit_at_5 += 1
 
-    print("\n--- Retrieval Results ---")
-    print("Claims used for Recall@k:", covered_count)
-    print(f"Recall@1: {recall_at_1:.2%}")
-    print(f"Recall@3: {recall_at_3:.2%}")
-    print(f"Recall@5: {recall_at_5:.2%}")
+        # Calculate evidence-level Recall@k.
+        total_gold = len(gold_evidence)
+
+        evidence_recall_at_1 += (
+            len(gold_evidence.intersection(retrieved_evidence[:1]))
+            / total_gold
+        )
+
+        evidence_recall_at_3 += (
+            len(gold_evidence.intersection(retrieved_evidence[:3]))
+            / total_gold
+        )
+
+        evidence_recall_at_5 += (
+            len(gold_evidence.intersection(retrieved_evidence[:5]))
+            / total_gold
+        )
+
+    # Calculate average scores across covered claims.
+    hit_at_1 /= covered_count
+    hit_at_3 /= covered_count
+    hit_at_5 /= covered_count
+
+    evidence_recall_at_1 /= covered_count
+    evidence_recall_at_3 /= covered_count
+    evidence_recall_at_5 /= covered_count
+
+    print("\n--- Retrieval Evaluation Results ---")
+    print("Claims evaluated:", covered_count)
+
+    print("\nHit@k (percentage of claims with at least one correct result)")
+    print(f"Hit@1: {hit_at_1:.2%}")
+    print(f"Hit@3: {hit_at_3:.2%}")
+    print(f"Hit@5: {hit_at_5:.2%}")
+
+    print("\nEvidence Recall@k (average proportion of gold evidence retrieved)")
+    print(f"Evidence Recall@1: {evidence_recall_at_1:.2%}")
+    print(f"Evidence Recall@3: {evidence_recall_at_3:.2%}")
+    print(f"Evidence Recall@5: {evidence_recall_at_5:.2%}")
 
     print(
-        "\nMetric note: Recall@k here measures the percentage of "
-        "covered claims for which at least one annotated evidence "
-        "sentence appears in the top k retrieved results."
+        "\nMetric note: Hit@k measures whether at least one correct "
+        "evidence sentence appears in the top k results. Evidence "
+        "Recall@k measures the proportion of available gold evidence "
+        "sentences retrieved, averaged across evaluated claims."
     )
 
     print(
