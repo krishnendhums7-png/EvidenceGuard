@@ -123,41 +123,28 @@ def build_evidence_sample(project_folder, max_claims=50):
         if found_page_ids >= target_page_ids:
             break
 
-    # Keep the existing sample and add the newly extracted sentences.
-    if sample_file.exists():
-        existing_df = pd.read_csv(
-            sample_file,
-            dtype={"page_id": str, "sentence_id": str}
-        )
-    else:
-        existing_df = pd.DataFrame(
-            columns=["page_id", "sentence_id", "text"]
-        )
-
+   
+    # Build a fresh sample for reproducible results.
     new_df = pd.DataFrame(
         new_records,
         columns=["page_id", "sentence_id", "text"]
     )
 
-    combined_df = pd.concat(
-        [existing_df, new_df],
-        ignore_index=True
-    )
+    new_df["page_id"] = new_df["page_id"].astype(str)
+    new_df["sentence_id"] = new_df["sentence_id"].astype(str)
 
-    combined_df["page_id"] = combined_df["page_id"].astype(str)
-    combined_df["sentence_id"] = (
-        combined_df["sentence_id"].astype(str)
-    )
-
-    combined_df = combined_df.drop_duplicates(
+    combined_df = new_df.drop_duplicates(
         subset=["page_id", "sentence_id"]
     ).reset_index(drop=True)
+
+    sample_file.parent.mkdir(parents=True, exist_ok=True)
 
     combined_df.to_csv(
         sample_file,
         index=False,
         encoding="utf-8"
     )
+
 
     missing_page_ids = target_page_ids - found_page_ids
 

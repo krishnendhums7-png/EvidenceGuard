@@ -13,7 +13,7 @@ EvidenceGuard is a claim-evidence retrieval component for a fact-checking projec
 5. Creates sentence embeddings using `all-MiniLM-L6-v2`.
 6. Builds a FAISS vector index.
 7. Retrieves the top-k evidence sentences for a claim.
-8. Evaluates retrieval using Recall@k for claims that have annotated evidence represented in the current sample.
+8. Evaluates retrieval using Hit@k and Evidence Recall@k for claims whose annotated evidence is represented in the current sample.
 
 ## 2. Project structure
 
@@ -133,31 +133,50 @@ What each script does:
 
 The scripts may overwrite generated files in `data/samples/` when rerun.
 
+
 ## 6. Retrieval behavior
 
-The retriever encodes an input claim using the same sentence-transformer model, searches the FAISS index, and returns ranked evidence records with their source identifiers and distances.
+The retriever encodes an input claim using the same sentence-transformer model and searches the FAISS index to find the most relevant evidence sentences.
 
-The current index uses FAISS L2 distance. **Lower distance indicates a closer vector match** for this index and embedding setup.
+The current index uses normalized embeddings and FAISS `IndexFlatIP` to perform cosine similarity search.
+
+The retriever returns ranked evidence records containing:
+
+- `page_id`: Wikipedia page identifier
+- `sentence_id`: sentence identifier
+- `text`: retrieved evidence sentence
+- `similarity`: cosine similarity score
+
+A higher cosine similarity score indicates a closer match between the claim and the evidence sentence.
+
+
 
 ## 7. Retrieval evaluation
 
-The evaluation script compares retrieved page/sentence identifiers against annotated FEVER evidence. Recall@k is calculated over claims for which at least one annotated evidence sentence is represented in the current sample. A claim counts as retrieved at k when at least one annotated evidence sentence appears among the top k results.
+The evaluation script compares retrieved page and sentence identifiers against annotated FEVER evidence.
+
+Two metrics are reported:
+
+- **Hit@k:** Measures whether at least one annotated evidence sentence appears in the top k retrieved results.
+- **Evidence Recall@k:** Measures the proportion of annotated evidence sentences retrieved within the top k results, averaged across evaluated claims.
 
 ### Verified sample run
-
-The following results were observed when the pipeline was rebuilt:
 
 | Measure | Result |
 |---|---:|
 | FEVER claims with annotated evidence eligible for evaluation | 6,666 |
 | Claims with evidence represented in the sample | 660 |
-| Evidence sentences in the sample | 918 |
+| Evidence sentences in the sample | 565 |
 | Sample corpus coverage | 9.90% |
-| Recall@1 | 71.36% |
-| Recall@3 | 86.97% |
-| Recall@5 | 93.03% |
+| Hit@1 | 71.36% |
+| Hit@3 | 87.27% |
+| Hit@5 | 93.18% |
+| Evidence Recall@1 | 59.66% |
+| Evidence Recall@3 | 75.67% |
+| Evidence Recall@5 | 82.38% |
 
-These figures describe the current sample-based evaluation only.
+These figures describe the current sample-based evaluation only. They are not full-FEVER performance results.
+
 
 ## 8. Limitations
 
