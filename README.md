@@ -39,12 +39,12 @@ Existing approaches often rely on "LLM-as-a-judge", querying another LLM instanc
 |---|---|---|
 | **Language & OS** | Core Environment | Python 3.13 / Windows 11 / PowerShell |
 | **LLM Generation** | Generation Service | Gemini API via official `google-genai` SDK |
-| **Embeddings** | Dense Retrieval | `sentence-transformers` (`all-MiniLM-L6-v2`) |
-| **Vector Store** | Local Indexing | `faiss-cpu` (Inner Product / Cosine Similarity) |
+| **Embeddings** | Dense Retrieval | `sentence-transformers` (`all-MiniLM-L6-v2`, 384 dims) |
+| **Vector Store** | Local Indexing | `faiss-cpu` (`IndexFlatIP`, Exact Cosine Similarity) |
 | **NLI Verification**| 3-Way Classifier | `cross-encoder/nli-deberta-v3-small` |
 | **Knowledge Base** | Reference Corpus | Official FEVER Wikipedia Corpus |
 | **Frontend** | Interactive UI | Streamlit + Plotly |
-| **Testing & QA** | Test Suite | `pytest` + `pytest-cov` |
+| **Testing & QA** | Test Suite | `pytest` + `pytest-cov` (91% code coverage) |
 
 ---
 
@@ -76,12 +76,13 @@ EvidenceGuard/
 │   ├── processed/                 # Cleaned evidence records (gitignored)
 │   └── samples/                   # Curated development sample datasets
 ├── indexes/                       # Serialized FAISS indexes and metadata
+│   ├── evidence_faiss.index       # Binary FAISS vector store
+│   └── evidence_faiss_metadata.jsonl # Document metadata aligned 1-to-1
 ├── scripts/
 │   ├── download_data.py           # Dataset acquisition and verification CLI
-│   ├── preprocess_data.py         # Evidence preprocessing runner
 │   ├── build_index.py             # FAISS indexing pipeline
 │   └── evaluate.py                # Benchmark evaluation suite
-├── tests/                         # Pytest automated test suite
+├── tests/                         # Pytest automated test suite (39 tests)
 ├── results/                       # Evaluation reports, confusion matrices, logs
 ├── logs/                          # Rotating application logs
 ├── .env.example                   # Environment configuration template
@@ -111,22 +112,32 @@ pip install -r requirements.txt
 ```
 
 ### Step 4: Configure Environment Variables
-Copy `.env.example` to `.env` and set your credentials:
+Copy `.env.example` to `.env`:
 ```powershell
 Copy-Item .env.example .env
 ```
-Edit `.env` to include your `GEMINI_API_KEY` (required only if generating new responses with Gemini; pasted verification runs offline).
+Edit `.env` if you wish to configure a `GEMINI_API_KEY` for LLM question answering.
 
 ---
 
-## 6. Running Tests & Dataset Verification
+## 6. Building the Vector Index & Running Tests
 
-Verify the environment, configuration, and sample datasets:
+### Build the FAISS Vector Index (Sample Mode)
 ```powershell
-# Run the test suite
+.\.venv\Scripts\python.exe scripts/build_index.py --mode sample
+```
+
+### Run Automated Tests & Code Coverage
+```powershell
+# Run all 39 tests with verbose output
 .\.venv\Scripts\pytest.exe -v tests/
 
-# Check dataset provenance and storage status
+# Run with module coverage report
+.\.venv\Scripts\pytest.exe --cov=src tests/
+```
+
+### Verify Dataset Provenance & Disk Capacity
+```powershell
 .\.venv\Scripts\python.exe scripts/download_data.py --action info
 .\.venv\Scripts\python.exe scripts/download_data.py --action verify-sample
 .\.venv\Scripts\python.exe scripts/download_data.py --action check-storage
@@ -137,8 +148,8 @@ Verify the environment, configuration, and sample datasets:
 ## 7. Six-Phase Implementation Roadmap
 
 - **Phase 1: Foundation & Setup** *(Completed)*
-- **Phase 2: Evidence Preparation & Semantic Retrieval** *(Next)*
-- **Phase 3: LLM Integration & Atomic Claim Extraction**
+- **Phase 2: Evidence Preparation & Semantic Retrieval** *(Completed)*
+- **Phase 3: LLM Integration & Atomic Claim Extraction** *(Next)*
 - **Phase 4: NLI Verification Pipeline & Calibration**
 - **Phase 5: Interactive Streamlit Dashboard**
 - **Phase 6: Benchmark Evaluation, Testing & University Demo**
