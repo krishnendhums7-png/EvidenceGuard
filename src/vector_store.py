@@ -24,6 +24,11 @@ if _faiss_libs.is_dir():
         except Exception:
             pass
 
+# Set threading controls before native library load
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
+
 import faiss
 import numpy as np
 

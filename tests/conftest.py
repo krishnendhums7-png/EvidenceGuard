@@ -23,12 +23,11 @@ if faiss_libs.is_dir():
             pass
 
 # Prevent OpenMP multiple runtime collision on Windows
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-# Safe import of native libraries
-try:
-    import faiss
-    import torch
-except Exception:
-    pass
+# Explicitly initialize native C extensions before any GUI or threading libraries
+import faiss
+import torch

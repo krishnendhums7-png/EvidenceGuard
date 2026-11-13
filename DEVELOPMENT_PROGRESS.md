@@ -15,12 +15,60 @@
 | **Phase 2** | Evidence Preparation & Retrieval: FEVER Processing, Sentence Transformers, FAISS Indexing | **COMPLETED** | Nov 13, 2026 |
 | **Phase 3** | LLM & Claim Extraction: Gemini API Integration, Atomic Claim Decomposition, Pydantic Schema | **COMPLETED** | Nov 13, 2026 |
 | **Phase 4** | Verification Pipeline: DeBERTa NLI 3-Way Classifier, Calibration, End-to-End Orchestrator | **COMPLETED** | Nov 13, 2026 |
-| **Phase 5** | Frontend: Streamlit Multi-Page Dashboard, Claim Drilldown, Plotly Visualizations | Next Up | — |
+| **Phase 5** | Frontend: Streamlit Multi-Page Dashboard, Claim Drilldown, Plotly Visualizations, Export | **COMPLETED** | Nov 13, 2026 |
 | **Phase 6** | Evaluation & Finalization: FEVER Benchmarks, End-to-End Metrics, Testing, Capstone Demo | Scheduled | — |
 
 ---
 
-## 2. Phase 4 Detailed Implementation Log
+## 2. Phase 5 Detailed Implementation Log
+
+### A. Streamlit Application Architecture (`app/main.py`)
+- **Page Layout & Theme:** Configured with `layout="wide"`, responsive sidebar diagnostics, academic styling header, and custom CSS (`app/styles/custom.css`).
+- **One-Time Model & Index Caching:** Uses `@st.cache_resource` on `get_cached_pipeline()` to load `SentenceTransformer` (`all-MiniLM-L6-v2`), `CrossEncoder` (`cross-encoder/nli-deberta-v3-small`), and the FAISS vector index exactly once into memory, preventing GPU/CPU re-initialization overhead across user interactions.
+- **Workflow State Management:** Session state handles input persistence, selected workflow tab, and verification outputs across UI rerenders.
+- **System Diagnostics Sidebar:** Real-time visual status of Vector Store indexing (vector count, dimension, index type), NLI Cross-Encoder model name, and Gemini API authentication status with actionable fallback prompts.
+
+### B. Dual Verification Workflows
+- **Workflow A — Question-Based Verification:**
+  - Natural language input for user questions (e.g. *"What were Marie Curie's key achievements and where was she born?"*).
+  - Quick-load benchmark sample buttons for instant demonstration.
+  - Generates verifiable factual answers via Gemini 2.5 Flash using official `google-genai` SDK with real-time UI spinner.
+  - Automatically decomposes generated answer into atomic claims, retrieves evidence from FAISS, verifies via DeBERTa NLI, and renders unified results.
+- **Workflow B — Pasted-Text Verification (100% Offline Autonomy):**
+  - Accepts arbitrary LLM-generated prose from ChatGPT, Claude, LLaMA, or local models.
+  - Fully decoupled from external APIs — operates 100% offline using rule-based/regex clause decomposition, local FAISS dense retrieval, and local CPU cross-encoder inference.
+  - Built-in sample scenarios for quick testing:
+    1. *Albert Einstein (True & False Mix)*
+    2. *Marie Curie (Nobel Prize & Birthplace Facts)*
+    3. *Fictional / Unverifiable Island Claim (Pure NEI)*
+
+### C. Claim Cards & Evidence Provenance (`app/components/claim_cards.py`)
+- **Verdict Badging:**
+  - `SUPPORTED`: Crisp emerald badge with check icon.
+  - `REFUTED`: Vivid crimson badge with warning icon.
+  - `NOT ENOUGH INFORMATION`: Amber warning badge with question icon.
+- **Transparent Academic Metrics:**
+  - Explicitly marked as **"Uncalibrated Model Confidence"** ($P(\text{class}) \in [0, 1]$) to maintain academic rigor without claiming Bayesian calibration.
+  - Separate dense retrieval cosine similarity score ($\cos \theta \in [0, 1]$).
+  - Human-readable verification reasoning explaining why the verdict was assigned.
+- **Interactive Evidence Drilldown:**
+  - Expandable evidence section revealing all evaluated passages.
+  - Shows page title, Wikipedia sentence index (`§ID`), evidence text blockquote, retrieval score, and raw 3-class NLI probability breakdown (`Entailment`, `Contradiction`, `Neutral`).
+
+### D. Visual Analytics & Summary KPIs (`app/components/analytics.py`)
+- **Top-Level KPI Metric Tiles:**
+  - Total Claims Verified, Supported Claims, Refuted Claims, and Not Enough Information counts with responsive styling.
+- **Plotly Visualizations:**
+  - **Verdict Distribution Donut Chart:** High-contrast color-coded interactive donut chart displaying proportional verdict outcomes.
+  - **Confidence vs. Retrieval Comparison Bar Chart:** Grouped bar chart comparing DeBERTa uncalibrated confidence against FAISS retrieval similarity per claim.
+
+### E. Structured Export Service (`app/components/export.py`)
+- **JSON Export:** Full machine-readable audit report adhering to the Pydantic `CompleteVerificationResult` schema, including all claims, metadata, raw probabilities, and evidence provenance.
+- **CSV Export:** Tabular summary formatted for spreadsheet analysis (Claim ID, Claim Text, Verdict, Uncalibrated Confidence, Retrieval Similarity, Best Evidence Page, Sentence ID, and Best Evidence Text).
+
+---
+
+## 3. Phase 4 Detailed Implementation Log
 
 ### A. NLI Verification Model (`src/verifier.py`)
 - **Pretrained Cross-Encoder:** Employs `cross-encoder/nli-deberta-v3-small` running locally on CPU.

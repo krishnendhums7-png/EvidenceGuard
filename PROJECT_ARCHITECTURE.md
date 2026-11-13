@@ -171,6 +171,13 @@ Central end-to-end orchestrator binding all modules:
 - Implements `verify_question` (Workflow A: QA generation + verification) and `verify_pasted_text` (Workflow B: offline text verification).
 - Logs execution telemetry and returns standardized `CompleteVerificationResult` objects.
 
+### `app/main.py` & `app/components/` (Phase 5 Streamlit Frontend)
+Modern interactive web interface providing real-time verification and inspection:
+- **`app/main.py`:** Application entry point with wide responsive layout, custom academic CSS, sidebar diagnostics (FAISS index state, DeBERTa model status, Gemini API health), dual-tab workflow navigation, and `@st.cache_resource` for zero-overhead model reuse.
+- **`app/components/claim_cards.py`:** Renders color-coded verdict badges (`SUPPORTED` = green, `REFUTED` = red, `NOT ENOUGH INFORMATION` = amber), explicit "Uncalibrated Model Confidence" percentage, dense retrieval cosine similarity, reasoning description, and expandable evidence drilldown showing Wikipedia page title, sentence index (`§ID`), blockquote, and raw 3-class NLI probabilities.
+- **`app/components/analytics.py`:** Summary KPI scorecards and Plotly data visualizations (Verdict Distribution Donut Chart, Confidence vs. Retrieval Similarity Bar Chart).
+- **`app/components/export.py`:** Downloads verification audit reports as structured JSON (`CompleteVerificationResult` Pydantic payload) or CSV spreadsheet.
+
 ---
 
 ## 5. Mathematical & Methodological Formulation

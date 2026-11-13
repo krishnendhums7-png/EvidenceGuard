@@ -44,7 +44,7 @@ Existing approaches often rely on "LLM-as-a-judge", querying another LLM instanc
 | **NLI Verification**| 3-Way Classifier | `cross-encoder/nli-deberta-v3-small` (Entailment, Contradiction, Neutral) |
 | **Knowledge Base** | Reference Corpus | Official FEVER Wikipedia Corpus |
 | **Frontend** | Interactive UI | Streamlit + Plotly |
-| **Testing & QA** | Test Suite | `pytest` + `pytest-cov` (91% code coverage, 76 tests) |
+| **Testing & QA** | Test Suite | `pytest` + `pytest-cov` (84 tests, 100% pass rate) |
 
 ---
 
@@ -53,9 +53,14 @@ Existing approaches often rely on "LLM-as-a-judge", querying another LLM instanc
 ```
 EvidenceGuard/
 ├── app/
-│   ├── streamlit_app.py           # Main Streamlit application entrypoint
+│   ├── main.py                    # Main Streamlit interactive dashboard
 │   ├── components/                # Reusable UI widgets & claim cards
-│   └── pages/                     # Multi-page views (Dashboard, Verify, Evaluation, etc.)
+│   │   ├── claim_cards.py         # Verdict badges, confidence metrics & evidence drilldown
+│   │   ├── analytics.py           # Plotly charts (Verdict Donut, Confidence Comparison)
+│   │   └── export.py              # Audit report exporters (JSON & CSV)
+│   └── styles/
+│       └── custom.css             # Academic typography, badge styling & layout CSS
+├── run_app.py                     # Convenience launcher configuring Windows threading & paths
 ├── src/
 │   ├── config.py                  # Central configuration manager
 │   ├── logger.py                  # Rotating file and console logging
@@ -82,8 +87,9 @@ EvidenceGuard/
 │   ├── download_data.py           # Dataset acquisition and verification CLI
 │   ├── build_index.py             # FAISS indexing pipeline
 │   └── evaluate.py                # Benchmark evaluation suite
-├── tests/                         # Pytest automated test suite (59 tests)
+├── tests/                         # Pytest automated test suite (84 tests)
 │   ├── conftest.py                # Windows DLL environment initialization
+│   ├── test_app.py                # Streamlit UI, exports, and analytics tests (Phase 5)
 │   ├── test_config.py             # Configuration tests
 │   ├── test_corpus_loader.py      # Corpus streaming tests
 │   ├── test_preprocess.py         # Preprocessing and sentence extraction tests
@@ -92,6 +98,9 @@ EvidenceGuard/
 │   ├── test_retriever.py          # Semantic retriever and ranking tests
 │   ├── test_llm_service.py        # Gemini SDK and retry tests
 │   ├── test_claim_extractor.py    # Atomic claim decomposition tests
+│   ├── test_verifier.py           # DeBERTa NLI classification tests
+│   ├── test_result_formatter.py   # Reporting and metric calculation tests
+│   ├── test_pipeline.py           # End-to-end orchestrator tests
 │   └── test_sample_data.py        # Sample data integrity tests
 ├── results/                       # Evaluation reports, confusion matrices, logs
 ├── logs/                          # Rotating application logs
@@ -135,35 +144,35 @@ GEMINI_MODEL_NAME=gemini-2.5-flash
 
 ---
 
-## 6. Verification Workflows & Testing
+## 6. Verification Workflows & Application Execution
+
+### Launch Streamlit Interactive Dashboard
+Run the web application locally:
+```powershell
+.\.venv\Scripts\python.exe run_app.py
+```
+Or directly using the Streamlit CLI:
+```powershell
+.\.venv\Scripts\streamlit.exe run app/main.py
+```
+Open your browser to `http://localhost:8501`.
+
+### Interactive Web Dashboard Features:
+1. **Workflow A (Question-Based Verification):** Enter any factual question or click sample prompts (e.g. Marie Curie, Albert Einstein). Gemini generates an answer, which is automatically extracted into atomic claims, searched against the FAISS index, verified by DeBERTa-v3, and rendered with evidence drilldown.
+2. **Workflow B (Pasted-Text Verification — 100% Offline):** Paste any generated text from ChatGPT, Claude, LLaMA, or local LLMs. Operates 100% locally with zero internet dependencies.
+3. **Claim Cards & Evidence Provenance:** Color-coded badges (`SUPPORTED` = green, `REFUTED` = red, `NOT ENOUGH INFORMATION` = amber), explicit **Uncalibrated Model Confidence** metrics, dense cosine similarity scores, reasoning, and expandable Wikipedia passage citations with raw 3-class NLI probability breakdowns.
+4. **Visual Analytics:** Plotly interactive donut chart for verdict distribution and grouped bar charts comparing model confidence vs retrieval similarity.
+5. **Audit Report Export:** Download complete verification sessions as structured JSON or CSV spreadsheets.
 
 ### Test Suite Execution
 ```powershell
-# Run all 59 tests with verbose output
+# Run all 84 automated unit and integration tests
 .\.venv\Scripts\pytest.exe -v tests/
-
-# Run with module coverage report (89% coverage across src/)
-.\.venv\Scripts\pytest.exe --cov=src tests/
 ```
 
 ### Build or Rebuild the Vector Index
 ```powershell
 .\.venv\Scripts\python.exe scripts/build_index.py --mode sample
-```
-
-### Interactive Claim Extraction Demo (Python CLI)
-```python
-from src.claim_extractor import get_claim_extractor
-
-extractor = get_claim_extractor()
-
-# Workflow B: Verify pasted LLM text
-text = "Albert Einstein was born in Germany in 1879. He developed relativity."
-original, response = extractor.process_pasted_text_workflow(text)
-
-print(f"Extraction Method: {response.extraction_method}")
-for claim in response.claims:
-    print(f"[{claim.claim_id}] {claim.claim_text}")
 ```
 
 ---
@@ -173,7 +182,9 @@ for claim in response.claims:
 - **Phase 1: Foundation & Setup** *(Completed)*
 - **Phase 2: Evidence Preparation & Semantic Retrieval** *(Completed)*
 - **Phase 3: LLM Integration & Atomic Claim Extraction** *(Completed)*
-- **Phase 4: NLI Verification Pipeline & Calibration** *(Next)*
+- **Phase 4: NLI Verification Pipeline & Calibration** *(Completed)*
+- **Phase 5: Interactive Streamlit Dashboard** *(Completed)*
+- **Phase 6: Benchmark Evaluation, Testing & University Demo** *(Scheduled)*
 - **Phase 5: Interactive Streamlit Dashboard**
 - **Phase 6: Benchmark Evaluation, Testing & University Demo**
 
