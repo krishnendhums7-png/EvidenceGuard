@@ -41,10 +41,10 @@ Existing approaches often rely on "LLM-as-a-judge", querying another LLM instanc
 | **Claim Extraction** | Structured Decomposer | Structured JSON Prompting + Pydantic + Rule-Based Fallback |
 | **Dense Embeddings** | Dense Retrieval | `sentence-transformers` (`all-MiniLM-L6-v2`, 384 dims) |
 | **Vector Store** | Local Indexing | `faiss-cpu` (`IndexFlatIP`, Exact Cosine Similarity) |
-| **NLI Verification**| 3-Way Classifier | `cross-encoder/nli-deberta-v3-small` |
+| **NLI Verification**| 3-Way Classifier | `cross-encoder/nli-deberta-v3-small` (Entailment, Contradiction, Neutral) |
 | **Knowledge Base** | Reference Corpus | Official FEVER Wikipedia Corpus |
 | **Frontend** | Interactive UI | Streamlit + Plotly |
-| **Testing & QA** | Test Suite | `pytest` + `pytest-cov` (89% code coverage, 59 tests) |
+| **Testing & QA** | Test Suite | `pytest` + `pytest-cov` (91% code coverage, 76 tests) |
 
 ---
 

@@ -13,12 +13,16 @@ from pathlib import Path
 from typing import Any, Optional, Sequence, Union
 
 # Ensure Windows finds native DLLs for FAISS on Python 3.8+
+_dll_directory_handles: list[object] = []
 _faiss_libs = Path(sys.prefix) / "Lib" / "site-packages" / "faiss_cpu.libs"
-if _faiss_libs.is_dir() and hasattr(os, "add_dll_directory"):
-    try:
-        os.add_dll_directory(str(_faiss_libs))
-    except Exception:
-        pass
+if _faiss_libs.is_dir():
+    os.environ["PATH"] = str(_faiss_libs) + os.pathsep + os.environ.get("PATH", "")
+    if hasattr(os, "add_dll_directory"):
+        try:
+            # Must keep reference to avoid garbage collection closing the handle
+            _dll_directory_handles.append(os.add_dll_directory(str(_faiss_libs)))
+        except Exception:
+            pass
 
 import faiss
 import numpy as np

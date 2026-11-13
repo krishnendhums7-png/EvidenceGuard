@@ -151,6 +151,26 @@ Decomposes complex prose into atomic factual propositions:
   - **Workflow B:** Pasted Text $\rightarrow$ Atomic Claim Extraction.
 - Provides deterministic rule-based segmentation fallback for 100% offline uptime.
 
+### `src/verifier.py`
+Cross-encoder Natural Language Inference (NLI) engine using `cross-encoder/nli-deberta-v3-small`:
+- Dynamically resolves output label mappings (`contradiction` $\rightarrow$ `REFUTED`, `entailment` $\rightarrow$ `SUPPORTED`, `neutral` $\rightarrow$ `NOT ENOUGH INFORMATION`).
+- Contextualizes premises with page titles (`human_title: evidence_text`) to eliminate anaphoric ambiguity on pronouns ("He", "She").
+- Implements relevance-weighted multi-passage evidence aggregation competing across classes ($w_{\text{sup}}, w_{\text{ref}}, w_{\text{neu}}$).
+- Detects genuine evidentiary conflicts when opposing evidence has comparable top-tier retrieval similarity.
+- Strictly labels probabilities as `uncalibrated_model_confidence`.
+
+### `src/result_formatter.py`
+Standardizes verification results and metrics:
+- Formats structured Pydantic models (`ClaimVerificationResult`, `VerificationSummary`, `CompleteVerificationResult`).
+- Computes aggregate metrics: claim counts, class percentages, average confidence, processing duration.
+- Generates structured JSON serialization and human-readable terminal reports with status glyphs.
+
+### `src/pipeline.py`
+Central end-to-end orchestrator binding all modules:
+- Manages singletons for retrieval, claim extraction, and verification.
+- Implements `verify_question` (Workflow A: QA generation + verification) and `verify_pasted_text` (Workflow B: offline text verification).
+- Logs execution telemetry and returns standardized `CompleteVerificationResult` objects.
+
 ---
 
 ## 5. Mathematical & Methodological Formulation
@@ -162,14 +182,21 @@ Because all vectors are L2-normalized during embedding generation ($\|\mathbf{e}
 $$\text{Sim}(c, p_i) = \mathbf{e}_c \cdot \mathbf{e}_{p_i}$$
 The top-$K$ passages $\mathcal{P}_K(c) = \arg\max_{p \in \mathcal{K}}^K \text{Sim}(c, p)$ are retrieved subject to $\text{Sim}(c, p) \ge \tau_{\text{retrieval}}$.
 
-### B. Natural Language Inference Verification (Phase 4)
-For each candidate evidence passage $p \in \mathcal{P}_K(c)$ as premise and claim $c$ as hypothesis:
-$$P(\text{Class} \mid p, c) = \text{Softmax}\left(\text{DeBERTa}(p, c)\right) \in [0, 1]^3$$
+### B. Natural Language Inference Verification & Relevance-Weighted Aggregation
+For each candidate evidence passage $p_i \in \mathcal{P}_K(c)$ contextualized with its entity title and claim $c$ as hypothesis:
+$$P(\text{Class} \mid p_i, c) = \text{Softmax}\left(\text{DeBERTa}([\text{title}_i: p_i], c)\right) \in [0, 1]^3$$
 where $\text{Class} \in \{\text{Entailment, Contradiction, Neutral}\}$.
-The final verdict $V(c)$ aggregates evidence across $\mathcal{P}_K(c)$:
+
+To prevent lower-similarity background passages from overriding high-relevance on-topic evidence, class scores are weighted by retrieval similarity:
+$$w_{\text{sup}} = \max_{p_i} \left( \max(0, \text{Sim}(c, p_i)) \times P(\text{Entailment} \mid p_i, c) \right)$$
+$$w_{\text{ref}} = \max_{p_i} \left( \max(0, \text{Sim}(c, p_i)) \times P(\text{Contradiction} \mid p_i, c) \right)$$
+$$w_{\text{neu}} = \max_{p_i} \left( \max(0, \text{Sim}(c, p_i)) \times P(\text{Neutral} \mid p_i, c) \right)$$
+
+The final verdict $V(c)$ is assigned using a competitive decision hierarchy:
 $$V(c) = \begin{cases}
-\text{SUPPORTED}, & \text{if } \exists p \text{ s.t. } P(\text{Entailment} \mid p, c) > \tau_{\text{nli}} \\
-\text{REFUTED}, & \text{if } \exists p \text{ s.t. } P(\text{Contradiction} \mid p, c) > \tau_{\text{nli}} \\
+\text{CONFLICTING}, & \text{if } w_{\text{sup}}, w_{\text{ref}} \ge \tau \text{ and } \frac{\min(w_{\text{sup}}, w_{\text{ref}})}{\max(w_{\text{sup}}, w_{\text{ref}})} \ge 0.75 \text{ and } \text{Sim} \ge 0.70 s_{\max} \\
+\text{SUPPORTED}, & \text{if } w_{\text{sup}} > w_{\text{ref}} \text{ and } w_{\text{sup}} \ge w_{\text{neu}} \text{ and } P(\text{Entailment}) \ge \tau_{\text{nli}} \\
+\text{REFUTED}, & \text{if } w_{\text{ref}} > w_{\text{sup}} \text{ and } w_{\text{ref}} \ge w_{\text{neu}} \text{ and } P(\text{Contradiction}) \ge \tau_{\text{nli}} \\
 \text{NOT ENOUGH INFO}, & \text{otherwise}
 \end{cases}$$
 
