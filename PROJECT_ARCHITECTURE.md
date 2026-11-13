@@ -45,11 +45,13 @@ EvidenceGuard addresses the critical problem of factual hallucination in Large L
           │                                   │
           ▼                                   │
   [ Gemini 2.5 Flash Generation ]             │
+  (via official google-genai SDK)             │
           │                                   │
           └───────────────┬───────────────────┘
                           │
                           ▼
             [ Atomic Claim Extractor ] ──> Structured prompt + Pydantic validation
+            (Dual-mode: Gemini Structured JSON or Rule-Based Fallback)
                           │
                           ▼
            [ Claim Embedding Generation ] ──> Sentence Transformer dense vector
@@ -85,15 +87,15 @@ EvidenceGuard addresses the critical problem of factual hallucination in Large L
 | Component | Technology | Rationale & Model Choice |
 |---|---|---|
 | **Runtime & Shell** | Python 3.13 / Windows PowerShell | Local development, standard cross-platform support |
-| **LLM Generation** | Gemini API (`google-genai` SDK) | Configurable, fast, state-of-the-art response generator |
-| **Claim Extraction** | Structured JSON Prompting + Pydantic | Guarantees atomic claims without altering semantic facts |
+| **LLM Generation** | Gemini API (`google-genai` SDK) | `gemini-2.5-flash`: Fast, state-of-the-art response generator |
+| **Claim Extraction** | Structured JSON Prompting + Pydantic | Validates atomic claims; provides deterministic rule-based fallback |
 | **Dense Embeddings** | `sentence-transformers` (`all-MiniLM-L6-v2`) | 384 dimensions, ~80MB, fast CPU inference, high semantic retrieval quality |
 | **Vector Index** | `faiss-cpu` (`IndexFlatIP`) | Exact Cosine Similarity search with zero quantization distortion |
 | **NLI Verification** | `cross-encoder/nli-deberta-v3-small` | DeBERTa architecture with disentangled attention for 3-way NLI classification |
 | **Benchmark Dataset**| FEVER (Fact Extraction and VERification) | Standard academic benchmark with 185k claims & Wikipedia evidence |
 | **Web Frontend** | Streamlit + Plotly | Interactive multi-page dashboard, claim drill-down, metric charts |
 | **Evaluation** | `scikit-learn` | Precision, Recall, Macro F1, Per-class F1, Confusion Matrix, Recall@K |
-| **Testing** | `pytest` + `pytest-cov` | High coverage unit & integration testing suite (91% code coverage) |
+| **Testing** | `pytest` + `pytest-cov` | High coverage unit & integration testing suite (89% code coverage) |
 
 ---
 
@@ -125,13 +127,29 @@ Segments raw document texts into individual evidence sentences, cleans FEVER tok
 Encapsulates `sentence-transformers/all-MiniLM-L6-v2`. Provides CPU-optimized batch inference and single query encoding. Employs L2 normalization ($\|v\|_2 = 1.0$) so that inner product computations correspond directly to cosine similarity. Implements offline cache loading to ensure zero network latency during local execution.
 
 ### `src/vector_store.py`
-Wraps `faiss.IndexFlatIP`. Maintains exact synchronization between vector indices and evidence metadata records. Persists binary indexes (`evidence_faiss.index`) alongside JSONL metadata (`evidence_faiss_metadata.jsonl`), validating record count alignment upon every load operation.
+Wraps `faiss.IndexFlatIP`. Maintains exact synchronization between vector indices and evidence metadata records. Persists binary indexes (`evidence_faiss.index`) alongside JSONL metadata (`evidence_faiss_metadata.jsonl`), validating record count alignment upon every load operation. Registers native Windows DLL directories on startup.
 
 ### `src/retriever.py`
 Orchestrates semantic search for input claims. Computes dense embeddings, executes FAISS similarity searches, applies configurable similarity thresholds, and outputs `RetrievalResult` objects containing ranked passages and timing telemetry. Explicitly maintains the semantic boundary: high similarity indicates topical relevance, not factual truth.
 
-### `scripts/build_index.py`
-Command-line index generator capable of processing sample datasets or multi-gigabyte corpus files in streaming batches without memory overflow. Includes built-in retrieval validation benchmarking.
+### `src/llm_service.py`
+Integrates the official Google Gen AI SDK (`google-genai`). Features:
+- Secure `.env` credential management with zero logging of API keys.
+- Configurable models (`gemini-2.5-flash` default).
+- Question-based answer generation with factual system prompts.
+- Structured JSON prompting for claim extraction.
+- Exponential backoff retry handler (`@retry_with_backoff`) for rate limits and transient connection errors.
+- Decoupled architecture allowing offline verification of user-pasted text without requiring Gemini credentials.
+
+### `src/claim_extractor.py`
+Decomposes complex prose into atomic factual propositions:
+- Pydantic schema validation (`ExtractedClaim`, `ClaimExtractionResponse`).
+- Filters out non-factual conversational framing and pleasantries.
+- Splits compound sentences joined by conjunctions into standalone propositions.
+- Supports two unified workflows:
+  - **Workflow A:** User Question $\rightarrow$ Gemini Answer Generation $\rightarrow$ Atomic Claim Extraction.
+  - **Workflow B:** Pasted Text $\rightarrow$ Atomic Claim Extraction.
+- Provides deterministic rule-based segmentation fallback for 100% offline uptime.
 
 ---
 
@@ -161,3 +179,4 @@ $$V(c) = \begin{cases}
 1. **Memory Ceiling:** Streaming generator pipelines ensure peak memory usage stays below 1.5 GB RAM during indexing and retrieval.
 2. **Deterministic Fallbacks:** The system functions offline once models are cached, without requiring active internet access.
 3. **Provable Provenance:** Every retrieved evidence passage retains its source Wikipedia article title and sentence index.
+4. **Credential Isolation:** API keys remain strictly on the host in `.env`, preventing accidental leakage or exposure in outputs and logs.

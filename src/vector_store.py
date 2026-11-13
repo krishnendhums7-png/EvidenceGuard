@@ -7,8 +7,19 @@ and 1-to-1 position-based alignment with evidence passage metadata.
 from __future__ import annotations
 
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Any, Optional, Sequence, Union
+
+# Ensure Windows finds native DLLs for FAISS on Python 3.8+
+_faiss_libs = Path(sys.prefix) / "Lib" / "site-packages" / "faiss_cpu.libs"
+if _faiss_libs.is_dir() and hasattr(os, "add_dll_directory"):
+    try:
+        os.add_dll_directory(str(_faiss_libs))
+    except Exception:
+        pass
+
 import faiss
 import numpy as np
 

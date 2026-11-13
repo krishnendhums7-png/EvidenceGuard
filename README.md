@@ -22,14 +22,13 @@ Existing approaches often rely on "LLM-as-a-judge", querying another LLM instanc
 ## 2. Key Architectural Features
 
 - **Offline Evidence Ingestion:** Streams and cleans Wikipedia dump articles, partitions texts into sentence-level evidence units, preserves sentence identifiers, generates dense vector representations via Sentence Transformers, and builds local FAISS indexes.
-- **Online Verification Engine:** 
-  1. Accepts user questions (generating candidate answers via Gemini API) or pasted text from any arbitrary LLM.
-  2. Extracts independent atomic claims using structured Pydantic schemas.
-  3. Retrieves top-$K$ semantically relevant evidence passages using FAISS dense vector search with cosine similarity filtering.
-  4. Evaluates premise-hypothesis pairs using a pretrained `cross-encoder/nli-deberta-v3-small` model.
-  5. Formats classification verdicts with calibrated confidence scores, full provenance citations, and explanations.
-- **Interactive Streamlit Dashboard:** Multi-page user interface offering verification playgrounds, claim-by-claim drilldowns, evidence explorers, and benchmark evaluation metrics.
-- **Reproducible Academic Benchmarking:** Standard IR and NLP evaluation metrics including Recall@K, Accuracy, Precision, Recall, Per-class F1, Macro F1, and Confusion Matrices.
+- **LLM Integration & Atomic Claim Extraction:**
+  - **Dual Workflows:** Supports both interactive question-answering with Gemini 2.5 Flash (`google-genai` SDK) and offline verification of user-pasted LLM text.
+  - **Pydantic Validation:** Formally validates atomic claims, entities, and execution metadata.
+  - **Deterministic Fallback:** Robust rule-based sentence and clause segmentation ensuring 100% offline uptime when API keys are absent.
+- **Semantic Evidence Retrieval:** Retrieves top-$K$ semantically relevant evidence passages using FAISS dense vector search (`IndexFlatIP`) with cosine similarity filtering.
+- **NLI Verification (Phase 4):** Evaluates premise-hypothesis pairs using a pretrained `cross-encoder/nli-deberta-v3-small` model.
+- **Interactive Streamlit Dashboard (Phase 5):** Multi-page user interface offering verification playgrounds, claim-by-claim drilldowns, evidence explorers, and benchmark evaluation metrics.
 
 ---
 
@@ -38,13 +37,14 @@ Existing approaches often rely on "LLM-as-a-judge", querying another LLM instanc
 | Layer | Component | Choice |
 |---|---|---|
 | **Language & OS** | Core Environment | Python 3.13 / Windows 11 / PowerShell |
-| **LLM Generation** | Generation Service | Gemini API via official `google-genai` SDK |
-| **Embeddings** | Dense Retrieval | `sentence-transformers` (`all-MiniLM-L6-v2`, 384 dims) |
+| **LLM Generation** | Generation Service | Gemini API via official `google-genai` SDK (`gemini-2.5-flash`) |
+| **Claim Extraction** | Structured Decomposer | Structured JSON Prompting + Pydantic + Rule-Based Fallback |
+| **Dense Embeddings** | Dense Retrieval | `sentence-transformers` (`all-MiniLM-L6-v2`, 384 dims) |
 | **Vector Store** | Local Indexing | `faiss-cpu` (`IndexFlatIP`, Exact Cosine Similarity) |
 | **NLI Verification**| 3-Way Classifier | `cross-encoder/nli-deberta-v3-small` |
 | **Knowledge Base** | Reference Corpus | Official FEVER Wikipedia Corpus |
 | **Frontend** | Interactive UI | Streamlit + Plotly |
-| **Testing & QA** | Test Suite | `pytest` + `pytest-cov` (91% code coverage) |
+| **Testing & QA** | Test Suite | `pytest` + `pytest-cov` (89% code coverage, 59 tests) |
 
 ---
 
@@ -67,9 +67,9 @@ EvidenceGuard/
 │   ├── retriever.py               # Semantic search engine
 │   ├── llm_service.py             # Official Google Gen AI SDK wrapper
 │   ├── claim_extractor.py         # Atomic claim decomposition & Pydantic schema
-│   ├── verifier.py                # Cross-encoder DeBERTa NLI engine
-│   ├── pipeline.py                # End-to-end verification orchestrator
-│   ├── result_formatter.py        # Centralized result structure & audit logs
+│   ├── verifier.py                # Cross-encoder DeBERTa NLI engine (Phase 4)
+│   ├── pipeline.py                # End-to-end verification orchestrator (Phase 4)
+│   ├── result_formatter.py        # Centralized result structure & audit logs (Phase 4)
 │   └── evaluation.py              # Benchmark metrics (Recall@K, F1, Confusion Matrix)
 ├── data/
 │   ├── raw/                       # Raw FEVER downloads (gitignored)
@@ -82,7 +82,17 @@ EvidenceGuard/
 │   ├── download_data.py           # Dataset acquisition and verification CLI
 │   ├── build_index.py             # FAISS indexing pipeline
 │   └── evaluate.py                # Benchmark evaluation suite
-├── tests/                         # Pytest automated test suite (39 tests)
+├── tests/                         # Pytest automated test suite (59 tests)
+│   ├── conftest.py                # Windows DLL environment initialization
+│   ├── test_config.py             # Configuration tests
+│   ├── test_corpus_loader.py      # Corpus streaming tests
+│   ├── test_preprocess.py         # Preprocessing and sentence extraction tests
+│   ├── test_embeddings.py         # Dense embedding service tests
+│   ├── test_vector_store.py       # FAISS vector store tests
+│   ├── test_retriever.py          # Semantic retriever and ranking tests
+│   ├── test_llm_service.py        # Gemini SDK and retry tests
+│   ├── test_claim_extractor.py    # Atomic claim decomposition tests
+│   └── test_sample_data.py        # Sample data integrity tests
 ├── results/                       # Evaluation reports, confusion matrices, logs
 ├── logs/                          # Rotating application logs
 ├── .env.example                   # Environment configuration template
@@ -116,31 +126,44 @@ Copy `.env.example` to `.env`:
 ```powershell
 Copy-Item .env.example .env
 ```
-Edit `.env` if you wish to configure a `GEMINI_API_KEY` for LLM question answering.
+Edit `.env` if you wish to configure a `GEMINI_API_KEY` for LLM question answering:
+```env
+GEMINI_API_KEY=your_actual_key_here
+GEMINI_MODEL_NAME=gemini-2.5-flash
+```
+*Note: If no key is provided, EvidenceGuard automatically operates using deterministic rule-based claim extraction for pasted LLM responses.*
 
 ---
 
-## 6. Building the Vector Index & Running Tests
+## 6. Verification Workflows & Testing
 
-### Build the FAISS Vector Index (Sample Mode)
+### Test Suite Execution
+```powershell
+# Run all 59 tests with verbose output
+.\.venv\Scripts\pytest.exe -v tests/
+
+# Run with module coverage report (89% coverage across src/)
+.\.venv\Scripts\pytest.exe --cov=src tests/
+```
+
+### Build or Rebuild the Vector Index
 ```powershell
 .\.venv\Scripts\python.exe scripts/build_index.py --mode sample
 ```
 
-### Run Automated Tests & Code Coverage
-```powershell
-# Run all 39 tests with verbose output
-.\.venv\Scripts\pytest.exe -v tests/
+### Interactive Claim Extraction Demo (Python CLI)
+```python
+from src.claim_extractor import get_claim_extractor
 
-# Run with module coverage report
-.\.venv\Scripts\pytest.exe --cov=src tests/
-```
+extractor = get_claim_extractor()
 
-### Verify Dataset Provenance & Disk Capacity
-```powershell
-.\.venv\Scripts\python.exe scripts/download_data.py --action info
-.\.venv\Scripts\python.exe scripts/download_data.py --action verify-sample
-.\.venv\Scripts\python.exe scripts/download_data.py --action check-storage
+# Workflow B: Verify pasted LLM text
+text = "Albert Einstein was born in Germany in 1879. He developed relativity."
+original, response = extractor.process_pasted_text_workflow(text)
+
+print(f"Extraction Method: {response.extraction_method}")
+for claim in response.claims:
+    print(f"[{claim.claim_id}] {claim.claim_text}")
 ```
 
 ---
@@ -149,8 +172,8 @@ Edit `.env` if you wish to configure a `GEMINI_API_KEY` for LLM question answeri
 
 - **Phase 1: Foundation & Setup** *(Completed)*
 - **Phase 2: Evidence Preparation & Semantic Retrieval** *(Completed)*
-- **Phase 3: LLM Integration & Atomic Claim Extraction** *(Next)*
-- **Phase 4: NLI Verification Pipeline & Calibration**
+- **Phase 3: LLM Integration & Atomic Claim Extraction** *(Completed)*
+- **Phase 4: NLI Verification Pipeline & Calibration** *(Next)*
 - **Phase 5: Interactive Streamlit Dashboard**
 - **Phase 6: Benchmark Evaluation, Testing & University Demo**
 
