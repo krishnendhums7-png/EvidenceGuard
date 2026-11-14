@@ -8,6 +8,7 @@ Streamlit interactive web dashboard supporting dual-workflow verification:
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 # Add project root to Python import path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
