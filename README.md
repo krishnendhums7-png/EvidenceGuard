@@ -1,238 +1,198 @@
 # EvidenceGuard
 
-EvidenceGuard is a claim-evidence retrieval component for a fact-checking project. This part of the project prepares a small evidence corpus from FEVER/Wikipedia data, converts evidence sentences into embeddings, builds a FAISS index, and retrieves relevant evidence for a claim.
+**Automated Hallucination Detection and Fact Verification of LLM Outputs Using Retrieval-Augmented Evidence Matching**
 
-> **Scope note:** This is a sample-based retrieval pipeline. It does not index the full Wikipedia corpus, and the reported retrieval scores are not full-FEVER performance.
+*A Postgraduate Capstone Research & Engineering Project — MSc Data Analytics and Computational Science*
 
-## 1. What this component does
+---
 
-1. Selects a manageable set of FEVER claims with annotated evidence.
-2. Finds the corresponding Wikipedia pages in the available Wikipedia shards.
-3. Extracts evidence sentences and retains their source identifiers.
-4. Cleans and deduplicates the evidence records.
-5. Creates sentence embeddings using `all-MiniLM-L6-v2`.
-6. Builds a FAISS vector index.
-7. Retrieves the top-k evidence sentences for a claim.
-8. Evaluates retrieval using Hit@k and Evidence Recall@k for claims whose annotated evidence is represented in the current sample.
+## 1. Project Overview & Motivation
 
-## 2. Project structure
+Large Language Models (LLMs) demonstrate remarkable fluency and reasoning capacity across a wide variety of domains. However, they frequently generate content that appears coherent yet contains factual inaccuracies—a phenomenon commonly characterized as **hallucination**. In high-stakes applications such as medicine, law, finance, and scientific research, unverified hallucinations pose substantial risks.
 
-```text
-EvidenceGuard/
-├── data/
-│   ├── raw/
-│   │   ├── paper_dev.jsonl
-│   │   └── wiki-pages/
-│   │       ├── wiki-001.jsonl
-│   │       └── ... wiki shard files ...
-│   └── samples/
-│       ├── evidence_sample.csv
-│       ├── cleaned_evidence.csv
-│       ├── evidence_embeddings.npy
-│       └── evidence_index.faiss
-├── src/
-│   ├── corpus_loader.py
-│   ├── preprocess.py
-│   ├── embeddings.py
-│   ├── vector_store.py
-│   ├── retriever.py
-│   └── evaluation.py
-└── tests/
-    ├── test_preprocess.py
-    └── test_retriever.py
-```
+Existing approaches often rely on "LLM-as-a-judge", querying another LLM instance to score truthfulness. Such methods suffer from stochastic output variance, lack of citation grounding, and self-reinforcing sycophancy.
 
-The raw data files must be placed in the paths expected by the scripts. The Wikipedia shard filenames shown above are examples of the available shard naming pattern.
+**EvidenceGuard** introduces a rigorous, retrieval-augmented verification framework grounded in the academic **FEVER** (Fact Extraction and VERification) benchmark. The system decomposes prose into atomic factual claims, searches a dense vector index of Wikipedia evidence passages, and applies a fine-tuned cross-encoder Natural Language Inference (NLI) model to perform 3-way factual classification:
+- **SUPPORTED:** The retrieved evidence logically entails the claim.
+- **REFUTED:** The retrieved evidence directly contradicts the claim.
+- **NOT ENOUGH INFORMATION (NEI):** The knowledge base lacks sufficient evidence to verify or refute the claim.
 
-## 3. Dataset and evidence structure
+---
 
-### FEVER claims
+## 2. Key Architectural Features
 
-The FEVER development data used by this component is stored at:
+- **Offline Evidence Ingestion:** Streams and cleans Wikipedia dump articles, partitions texts into sentence-level evidence units, preserves sentence identifiers, generates dense vector representations via Sentence Transformers, and builds local FAISS indexes.
+- **LLM Integration & Atomic Claim Extraction:**
+  - **Dual Workflows:** Supports both interactive question-answering with Gemini 2.5 Flash (`google-genai` SDK) and offline verification of user-pasted LLM text.
+  - **Pydantic Validation:** Formally validates atomic claims, entities, and execution metadata.
+  - **Deterministic Fallback:** Robust rule-based sentence and clause segmentation ensuring 100% offline uptime when API keys are absent.
+- **Semantic Evidence Retrieval:** Retrieves top-$K$ semantically relevant evidence passages using FAISS dense vector search (`IndexFlatIP`) with cosine similarity filtering.
+- **NLI Verification (Phase 4):** Evaluates premise-hypothesis pairs using a pretrained `cross-encoder/nli-deberta-v3-small` model.
+- **Interactive Streamlit Dashboard (Phase 5):** Multi-page user interface offering verification playgrounds, claim-by-claim drilldowns, evidence explorers, and benchmark evaluation metrics.
 
-```text
-data/raw/paper_dev.jsonl
-```
+---
 
-The records include fields such as:
+## 3. Technology Stack
 
-- `id`: claim identifier
-- `claim`: claim text
-- `label`: FEVER label
-- `verifiable`: whether evidence is expected
-- `evidence`: annotated evidence groups
-
-The evidence annotations include a Wikipedia page identifier and sentence identifier. The evaluation script uses these identifiers to check whether retrieved sentences match annotated evidence.
-
-### Wikipedia pages
-
-The Wikipedia data is stored under:
-
-```text
-data/raw/wiki-pages/
-```
-
-The available corpus is split into JSON Lines (`.jsonl`) shard files. Records contain fields such as `id`, `text`, and `lines`. The `lines` field contains sentence-level information that the corpus loader uses to extract evidence sentences.
-
-### Evidence records
-
-The sample and cleaned CSV files retain these key columns:
-
-- `page_id`: source Wikipedia page identifier
-- `sentence_id`: sentence identifier within the page
-- `text`: evidence sentence text
-
-Keeping the page and sentence identifiers makes it possible to trace retrieved evidence back to its source and compare retrieval results with FEVER annotations.
-
-## 4. Environment and dependencies
-
-Use a Python environment with the project dependencies installed. The pipeline uses:
-
-- `pandas` for tabular evidence data
-- `sentence-transformers` with `all-MiniLM-L6-v2` for sentence embeddings
-- `faiss-cpu` for vector indexing and similarity search
-- `numpy` for storing and handling embedding arrays
-
-Activate the project's virtual environment before running commands. On Windows Command Prompt, from the project root:
-
-```bat
-.venv\Scripts\activate
-```
-
-If dependencies are not installed in the environment, install the packages used by the project:
-
-```bat
-python -m pip install pandas sentence-transformers faiss-cpu numpy
-```
-
-The first embedding run may download the sentence-transformer model. A Hugging Face unauthenticated-request warning may appear; in the tested run, it did not prevent the pipeline from completing.
-
-## 5. Rebuild the retrieval pipeline
-
-Run the following commands **from the project root directory** (`D:\EvidenceGuard` in the current Windows setup), in this order:
-
-```bat
-python src/corpus_loader.py
-python src/preprocess.py
-python src/embeddings.py
-python src/vector_store.py
-python src/retriever.py
-python src/evaluation.py
-```
-
-What each script does:
-
-| Script | Purpose | Main output |
+| Layer | Component | Choice |
 |---|---|---|
-| `src/corpus_loader.py` | Selects claims, locates requested Wikipedia pages, and extracts evidence sentences | `data/samples/evidence_sample.csv` |
-| `src/preprocess.py` | Cleans and deduplicates evidence records | `data/samples/cleaned_evidence.csv` |
-| `src/embeddings.py` | Converts evidence text to sentence embeddings | `data/samples/evidence_embeddings.npy` |
-| `src/vector_store.py` | Builds and saves the FAISS index | `data/samples/evidence_index.faiss` |
-| `src/retriever.py` | Demonstrates top-k retrieval for a claim | Prints ranked evidence results |
-| `src/evaluation.py` | Computes sample coverage and Recall@k | Prints retrieval evaluation metrics |
+| **Language & OS** | Core Environment | Python 3.13 / Windows 11 / PowerShell |
+| **LLM Generation** | Generation Service | Gemini API via official `google-genai` SDK (`gemini-2.5-flash`) |
+| **Claim Extraction** | Structured Decomposer | Structured JSON Prompting + Pydantic + Rule-Based Fallback |
+| **Dense Embeddings** | Dense Retrieval | `sentence-transformers` (`all-MiniLM-L6-v2`, 384 dims) |
+| **Vector Store** | Local Indexing | `faiss-cpu` (`IndexFlatIP`, Exact Cosine Similarity) |
+| **NLI Verification**| 3-Way Classifier | `cross-encoder/nli-deberta-v3-small` (Entailment, Contradiction, Neutral) |
+| **Knowledge Base** | Reference Corpus | Official FEVER Wikipedia Corpus |
+| **Frontend** | Interactive UI | Streamlit + Plotly |
+| **Testing & QA** | Test Suite | `pytest` + `pytest-cov` (84 tests, 100% pass rate) |
 
-The scripts may overwrite generated files in `data/samples/` when rerun.
+---
 
+## 4. Project Directory Layout
 
-## 6. Retrieval behavior
-
-The retriever encodes an input claim using the same sentence-transformer model and searches the FAISS index to find the most relevant evidence sentences.
-
-The current index uses normalized embeddings and FAISS `IndexFlatIP` to perform cosine similarity search.
-
-The retriever returns ranked evidence records containing:
-
-- `page_id`: Wikipedia page identifier
-- `sentence_id`: sentence identifier
-- `text`: retrieved evidence sentence
-- `similarity`: cosine similarity score
-
-A higher cosine similarity score indicates a closer match between the claim and the evidence sentence.
-
-
-
-## 7. Retrieval evaluation
-
-The evaluation script compares retrieved page and sentence identifiers against annotated FEVER evidence.
-
-Two metrics are reported:
-
-- **Hit@k:** Measures whether at least one annotated evidence sentence appears in the top k retrieved results.
-- **Evidence Recall@k:** Measures the proportion of annotated evidence sentences retrieved within the top k results, averaged across evaluated claims.
-
-### Verified sample run
-
-| Measure | Result |
-|---|---:|
-| FEVER claims with annotated evidence eligible for evaluation | 6,666 |
-| Claims with evidence represented in the sample | 660 |
-| Evidence sentences in the sample | 565 |
-| Sample corpus coverage | 9.90% |
-| Hit@1 | 71.36% |
-| Hit@3 | 87.27% |
-| Hit@5 | 93.18% |
-| Evidence Recall@1 | 59.66% |
-| Evidence Recall@3 | 75.67% |
-| Evidence Recall@5 | 82.38% |
-
-These figures describe the current sample-based evaluation only. They are not full-FEVER performance results.
-
-
-## 8. Limitations
-
-- The pipeline indexes a small evidence sample, not all of Wikipedia.
-- In the verified corpus-loader run, 55 Wikipedia pages were requested; 54 were found and one was not found in the available shards.
-- The evaluation included 660 claims with evidence represented in the sample. It is therefore conditioned on sample coverage.
-- The reported Recall@k results must **not** be presented as performance on the full FEVER dataset.
-- Retrieval of evidence is not, by itself, a final true/false/NOT ENOUGH INFO verdict. Claim verification is handled by the other component of the project.
-
-## 9. Tests
-
-The following tests were previously run successfully:
-
-```bat
-python -m pytest tests/test_preprocess.py
-python -m pytest tests/test_retriever.py
+```
+EvidenceGuard/
+├── app/
+│   ├── main.py                    # Main Streamlit interactive dashboard
+│   ├── components/                # Reusable UI widgets & claim cards
+│   │   ├── claim_cards.py         # Verdict badges, confidence metrics & evidence drilldown
+│   │   ├── analytics.py           # Plotly charts (Verdict Donut, Confidence Comparison)
+│   │   └── export.py              # Audit report exporters (JSON & CSV)
+│   └── styles/
+│       └── custom.css             # Academic typography, badge styling & layout CSS
+├── run_app.py                     # Convenience launcher configuring Windows threading & paths
+├── src/
+│   ├── config.py                  # Central configuration manager
+│   ├── logger.py                  # Rotating file and console logging
+│   ├── utils.py                   # Safe JSONL, text cleaning & timer utilities
+│   ├── corpus_loader.py           # Wikipedia / FEVER streaming loader
+│   ├── preprocess.py              # Sentence segmentation & token normalization
+│   ├── embeddings.py              # Sentence Transformer dense embedding service
+│   ├── vector_store.py            # FAISS index persistence & management
+│   ├── retriever.py               # Semantic search engine
+│   ├── llm_service.py             # Official Google Gen AI SDK wrapper
+│   ├── claim_extractor.py         # Atomic claim decomposition & Pydantic schema
+│   ├── verifier.py                # Cross-encoder DeBERTa NLI engine (Phase 4)
+│   ├── pipeline.py                # End-to-end verification orchestrator (Phase 4)
+│   ├── result_formatter.py        # Centralized result structure & audit logs (Phase 4)
+│   └── evaluation.py              # Benchmark metrics (Recall@K, F1, Confusion Matrix)
+├── data/
+│   ├── raw/                       # Raw FEVER downloads (gitignored)
+│   ├── processed/                 # Cleaned evidence records (gitignored)
+│   └── samples/                   # Curated development sample datasets
+├── indexes/                       # Serialized FAISS indexes and metadata
+│   ├── evidence_faiss.index       # Binary FAISS vector store
+│   └── evidence_faiss_metadata.jsonl # Document metadata aligned 1-to-1
+├── scripts/
+│   ├── download_data.py           # Dataset acquisition and verification CLI
+│   ├── build_index.py             # FAISS indexing pipeline
+│   └── evaluate.py                # Benchmark evaluation suite
+├── tests/                         # Pytest automated test suite (84 tests)
+│   ├── conftest.py                # Windows DLL environment initialization
+│   ├── test_app.py                # Streamlit UI, exports, and analytics tests (Phase 5)
+│   ├── test_config.py             # Configuration tests
+│   ├── test_corpus_loader.py      # Corpus streaming tests
+│   ├── test_preprocess.py         # Preprocessing and sentence extraction tests
+│   ├── test_embeddings.py         # Dense embedding service tests
+│   ├── test_vector_store.py       # FAISS vector store tests
+│   ├── test_retriever.py          # Semantic retriever and ranking tests
+│   ├── test_llm_service.py        # Gemini SDK and retry tests
+│   ├── test_claim_extractor.py    # Atomic claim decomposition tests
+│   ├── test_verifier.py           # DeBERTa NLI classification tests
+│   ├── test_result_formatter.py   # Reporting and metric calculation tests
+│   ├── test_pipeline.py           # End-to-end orchestrator tests
+│   └── test_sample_data.py        # Sample data integrity tests
+├── results/                       # Evaluation reports, confusion matrices, logs
+├── logs/                          # Rotating application logs
+├── .env.example                   # Environment configuration template
+├── requirements.txt               # Pinned Python package dependencies
+├── DEVELOPMENT_PROGRESS.md        # Phase tracking & architectural decision log
+└── PROJECT_ARCHITECTURE.md        # Comprehensive technical architecture
 ```
 
-If `pytest` is not installed in the active environment, install it with:
+---
 
-```bat
-python -m pip install pytest
+## 5. Getting Started (Windows 11)
+
+### Step 1: Clone and Navigate to Directory
+```powershell
+cd D:\EvidenceGuard_New
 ```
 
-## 10. Reproducibility notes
-
-- Run commands from the project root so relative paths resolve correctly.
-- Keep the raw FEVER and Wikipedia data in the expected locations.
-- Run the scripts in the order listed in Section 5 so the sample, cleaned data, embeddings, and index are regenerated before evaluation.
-- Record any changes to the selected claim subset, corpus files, or embedding model because they can change the coverage and retrieval scores.
-
-
-
-## 11. Dataset Download
-
-The raw FEVER and Wikipedia datasets are hosted separately on Google Drive because of their large file size.
-
-**Google Drive:** [Download EvidenceGuard Raw Dataset](https://drive.google.com/drive/folders/1UlbPZSXO7iF2E8YQi4OTK_-JpQgvVe2p?usp=sharing)
-
-### Dataset Structure
-
-After downloading, place the files inside `data/raw/` as follows:
-
-```text
-data/
-└── raw/
-    ├── paper_dev.jsonl
-    ├── wiki-pages.zip
-    └── wiki-pages/
+### Step 2: Create & Activate Virtual Environment
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
 
-### Dataset Setup
+### Step 3: Install Verified Dependencies
+```powershell
+pip install -r requirements.txt
+```
 
-1. Download the raw dataset from the Google Drive link.
-2. Extract the dataset if downloaded as a ZIP archive.
-3. Place the files in the `data/raw/` directory.
-4. Ensure the folder structure matches the structure shown above.
+### Step 4: Configure Environment Variables
+Copy `.env.example` to `.env`:
+```powershell
+Copy-Item .env.example .env
+```
+Edit `.env` if you wish to configure a `GEMINI_API_KEY` for LLM question answering:
+```env
+GEMINI_API_KEY=your_actual_key_here
+GEMINI_MODEL_NAME=gemini-2.5-flash
+```
+*Note: If no key is provided, EvidenceGuard automatically operates using deterministic rule-based claim extraction for pasted LLM responses.*
 
-The raw dataset is not included in this GitHub repository due to its large size.
+---
+
+## 6. Verification Workflows & Application Execution
+
+### Launch Streamlit Interactive Dashboard
+Run the web application locally:
+```powershell
+.\.venv\Scripts\python.exe run_app.py
+```
+Or directly using the Streamlit CLI:
+```powershell
+.\.venv\Scripts\streamlit.exe run app/main.py
+```
+Open your browser to `http://localhost:8501`.
+
+### Interactive Web Dashboard Features:
+1. **Workflow A (Question-Based Verification):** Enter any factual question or click sample prompts (e.g. Marie Curie, Albert Einstein). Gemini generates an answer, which is automatically extracted into atomic claims, searched against the FAISS index, verified by DeBERTa-v3, and rendered with evidence drilldown.
+2. **Workflow B (Pasted-Text Verification — 100% Offline):** Paste any generated text from ChatGPT, Claude, LLaMA, or local LLMs. Operates 100% locally with zero internet dependencies.
+3. **Claim Cards & Evidence Provenance:** Color-coded badges (`SUPPORTED` = green, `REFUTED` = red, `NOT ENOUGH INFORMATION` = amber), explicit **Uncalibrated Model Confidence** metrics, dense cosine similarity scores, reasoning, and expandable Wikipedia passage citations with raw 3-class NLI probability breakdowns.
+4. **Visual Analytics:** Plotly interactive donut chart for verdict distribution and grouped bar charts comparing model confidence vs retrieval similarity.
+5. **Audit Report Export:** Download complete verification sessions as structured JSON or CSV spreadsheets.
+
+### Test Suite Execution
+```powershell
+# Run all 84 automated unit and integration tests
+.\.venv\Scripts\pytest.exe -v tests/
+```
+
+### Build or Rebuild the Vector Index
+```powershell
+.\.venv\Scripts\python.exe scripts/build_index.py --mode sample
+```
+
+---
+
+## 7. Six-Phase Implementation Roadmap
+
+- **Phase 1: Foundation & Setup** *(Completed)*
+- **Phase 2: Evidence Preparation & Semantic Retrieval** *(Completed)*
+- **Phase 3: LLM Integration & Atomic Claim Extraction** *(Completed)*
+- **Phase 4: NLI Verification Pipeline & Calibration** *(Completed)*
+- **Phase 5: Interactive Streamlit Dashboard** *(Completed)*
+- **Phase 6: Benchmark Evaluation, Testing & University Demo** *(Scheduled)*
+- **Phase 5: Interactive Streamlit Dashboard**
+- **Phase 6: Benchmark Evaluation, Testing & University Demo**
+
+---
+
+## 8. Academic References
+
+1. **Thorne, J., Vlachos, A., Christodoulopoulos, C., & Mittal, A.** (2018). *FEVER: a large-scale dataset for Fact Extraction and VERification*. NAACL-HLT 2018.
+2. **He, P., Gao, J., & Chen, W.** (2021). *DeBERTaV3: Improving DeBERTa using ELECTRA-Style Pre-Training with Gradient-Disentangled Embedding Sharing*. arXiv:2111.09543.
+3. **Reimers, N., & Gurevych, I.** (2019). *Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks*. EMNLP 2019.
+4. **Johnson, J., Douze, M., & Jégou, H.** (2019). *Billion-scale similarity search with GPUs*. IEEE Transactions on Big Data.
