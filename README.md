@@ -2,8 +2,6 @@
 
 **Automated Hallucination Detection and Fact Verification of LLM Outputs Using Retrieval-Augmented Evidence Matching**
 
-*A Postgraduate Capstone Research & Engineering Project — MSc Data Analytics and Computational Science*
-
 ---
 
 ## 1. Project Overview & Motivation
@@ -187,12 +185,3 @@ Open your browser to `http://localhost:8501`.
 - **Phase 6: Benchmark Evaluation, Testing & University Demo** *(Scheduled)*
 - **Phase 5: Interactive Streamlit Dashboard**
 - **Phase 6: Benchmark Evaluation, Testing & University Demo**
-
----
-
-## 8. Academic References
-
-1. **Thorne, J., Vlachos, A., Christodoulopoulos, C., & Mittal, A.** (2018). *FEVER: a large-scale dataset for Fact Extraction and VERification*. NAACL-HLT 2018.
-2. **He, P., Gao, J., & Chen, W.** (2021). *DeBERTaV3: Improving DeBERTa using ELECTRA-Style Pre-Training with Gradient-Disentangled Embedding Sharing*. arXiv:2111.09543.
-3. **Reimers, N., & Gurevych, I.** (2019). *Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks*. EMNLP 2019.
-4. **Johnson, J., Douze, M., & Jégou, H.** (2019). *Billion-scale similarity search with GPUs*. IEEE Transactions on Big Data.
