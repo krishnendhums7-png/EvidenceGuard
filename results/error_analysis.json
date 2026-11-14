@@ -1,0 +1,12 @@
+[
+  {
+    "claim_id": 98322,
+    "claim_text": "Marie Curie won a Nobel Prize in Economics.",
+    "gold_label": "REFUTED",
+    "predicted_label": "NOT ENOUGH INFORMATION",
+    "error_type": "Incorrect NEI (Retrieval or Aggregation Miss)",
+    "top_retrieved_evidence": "She was the first woman to win a Nobel Prize , the first person and only woman to win twice , and the only person to win a Nobel Prize in two different scientific fields : Physics and Chemistry .",
+    "confidence_score": 0.9971,
+    "explanation": "Ground truth was REFUTED, but system output NOT ENOUGH INFORMATION. Possible cause: Dense retriever failed to rank gold Wikipedia passage in top-K, or NLI probability did not exceed acceptance threshold."
+  }
+]
