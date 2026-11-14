@@ -1,0 +1,103 @@
+{
+  "benchmark_metadata": {
+    "timestamp": "2026-11-13 15:24:05",
+    "dataset_file": "D:\\EvidenceGuard_New\\data\\samples\\fever_sample.jsonl",
+    "total_claims": 15,
+    "indexed_vectors": 20,
+    "embedding_model": "all-MiniLM-L6-v2",
+    "nli_model": "cross-encoder/nli-deberta-v3-small",
+    "top_k": 5,
+    "elapsed_seconds": 12.68,
+    "dataset_limitations": "Evaluated on the local benchmark corpus (20 Wikipedia evidence vectors, 15 reproducible FEVER sample claims). Represents sample split validation, not full 145k FEVER test set."
+  },
+  "classification_metrics": {
+    "accuracy": 0.9333,
+    "macro_precision": 0.9333,
+    "macro_recall": 0.9333,
+    "macro_f1": 0.9259,
+    "total_samples": 15,
+    "per_class": {
+      "SUPPORTED": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1_score": 1.0,
+        "support": 6
+      },
+      "REFUTED": {
+        "precision": 1.0,
+        "recall": 0.8,
+        "f1_score": 0.8889,
+        "support": 5
+      },
+      "NOT ENOUGH INFORMATION": {
+        "precision": 0.8,
+        "recall": 1.0,
+        "f1_score": 0.8889,
+        "support": 4
+      }
+    },
+    "confusion_matrix": {
+      "SUPPORTED": {
+        "SUPPORTED": 6,
+        "REFUTED": 0,
+        "NOT ENOUGH INFORMATION": 0
+      },
+      "REFUTED": {
+        "SUPPORTED": 0,
+        "REFUTED": 4,
+        "NOT ENOUGH INFORMATION": 1
+      },
+      "NOT ENOUGH INFORMATION": {
+        "SUPPORTED": 0,
+        "REFUTED": 0,
+        "NOT ENOUGH INFORMATION": 4
+      }
+    },
+    "classes": [
+      "SUPPORTED",
+      "REFUTED",
+      "NOT ENOUGH INFORMATION"
+    ]
+  },
+  "retrieval_metrics": {
+    "recall_at_1": 0.7273,
+    "recall_at_3": 1.0,
+    "recall_at_5": 1.0,
+    "mrr": 0.8485,
+    "total_queries": 15,
+    "verifiable_queries": 11,
+    "evaluation_rule": "Strict FEVER rule: A retrieval is successful if all sentences in at least one acceptable gold evidence set appear in the top-K retrieved passages."
+  },
+  "threshold_sensitivity": [
+    {
+      "threshold": 0.3,
+      "accuracy": 0.9333,
+      "macro_f1": 0.9259,
+      "nei_count": 5
+    },
+    {
+      "threshold": 0.4,
+      "accuracy": 0.9333,
+      "macro_f1": 0.9259,
+      "nei_count": 5
+    },
+    {
+      "threshold": 0.5,
+      "accuracy": 0.9333,
+      "macro_f1": 0.9259,
+      "nei_count": 5
+    },
+    {
+      "threshold": 0.6,
+      "accuracy": 0.9333,
+      "macro_f1": 0.9259,
+      "nei_count": 5
+    },
+    {
+      "threshold": 0.7,
+      "accuracy": 0.9333,
+      "macro_f1": 0.9259,
+      "nei_count": 5
+    }
+  ]
+}
