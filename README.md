@@ -185,3 +185,20 @@ Open your browser to `http://localhost:8501`.
 - **Phase 6: Benchmark Evaluation, Testing & University Demo** *(Scheduled)*
 - **Phase 5: Interactive Streamlit Dashboard**
 - **Phase 6: Benchmark Evaluation, Testing & University Demo**
+---
+
+---
+
+## 8. Live Application Dashboard
+
+EvidenceGuard is deployed as an interactive Streamlit web application.
+
+**🚀 [Launch EvidenceGuard Dashboard](https://evidenceguard-nsg82uvplmu5kquwshbwrh.streamlit.app/)**
+
+Explore the dashboard features:
+- LLM-generated response verification.
+- Atomic factual claim extraction.
+- Evidence retrieval and NLI-based classification.
+- Claim-level confidence and evidence visualization.
+- Verification results and audit report exports.
+
