@@ -9,3 +9,8 @@ __pycache__/
 .mypy_cache/
 .ipynb_checkpoints/
 data/raw/
+
+# Streamlit secrets
+.streamlit/credentials.toml
+.streamlit/secrets.toml
+.streamlit/secrets/
